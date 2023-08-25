@@ -7,7 +7,7 @@ window.addEventListener("load", function () {
   ctx.fillStyle = "white";
   ctx.lineWidth = 3;
   ctx.strokeStyle = "black";
-  ctx.font = "40px Helvetica";
+  ctx.font = "40px Bangers";
   ctx.textAlign = "center";
 
   class Player {
@@ -30,6 +30,12 @@ window.addEventListener("load", function () {
       this.frameX = 0;
       this.frameY = 5;
       this.image = document.getElementById("bull");
+    }
+    restart() {
+      this.collisionX = this.game.width * 0.5;
+      this.collisionY = this.game.height * 0.5;
+      this.spriteX = this.collisionX - this.width * 0.5;
+      this.spriteY = this.collisionY - this.height * 0.5 - 100;
     }
     draw(context) {
       context.drawImage(
@@ -112,6 +118,5 @@ window.addEventListener("load", function () {
       });
     }
   }
-
 
 });
