@@ -471,5 +471,228 @@ window.addEventListener("load", function () {
     }
   }
 
+  class Game {
+    constructor(canvas) {
+      this.canvas = canvas;
+      this.width = this.canvas.width;
+      this.height = this.canvas.height;
+      this.topMargin = 260;
+      this.debug = false;
+      this.player = new Player(this);
+      this.fps = 70;
+      this.timer = 0;
+      this.interval = 1000 / this.fps;
+      this.eggTimer = 0;
+      this.eggInterval = 1000;
+      this.numberOfObstacles = 5;
+      this.maxEggs = 5;
+      this.obstacles = [];
+      this.eggs = [];
+      this.particles = [];
+      this.gameObjects = [];
+      this.enemies = [];
+      this.hatchlings = [];
+      this.score = 0;
+      this.winningScore = 1;
+      this.lostHatchlings = 0;
+      this.gameOver = false;
+      this.mouse = {
+        x: this.width * 0.5,
+        y: this.width * 0.5,
+        pressed: false,
+      };
 
+      // event listerners
+      canvas.addEventListener("mousedown", (e) => {
+        this.mouse.x = e.offsetX;
+        this.mouse.y = e.offsetY;
+        this.pressed = true;
+      });
+      canvas.addEventListener("mouseup", (e) => {
+        this.mouse.x = e.offsetX;
+        this.mouse.y = e.offsetY;
+        this.pressed = false;
+      });
+      canvas.addEventListener("mousemove", (e) => {
+        if (this.mouse.pressed) {
+          this.mouse.x = e.offsetX;
+          this.mouse.y = e.offsetY;
+        }
+      });
+      window.addEventListener("keydown", (e) => {
+        if (e.key == "d") this.debug = !this.debug;
+        else if (e.key == "r") this.restart();
+        //console.log(this.debug);
+      });
+    }
+    render(context, deltaTime) {
+      if (this.timer > this.interval) {
+        context.clearRect(0, 0, this.width, this.height);
+        this.gameObjects = [
+          this.player,
+          ...this.eggs,
+          ...this.obstacles,
+          ...this.enemies,
+          ...this.hatchlings,
+          ...this.particles,
+        ];
+
+        // sort by vertical position
+        this.gameObjects.sort((a, b) => {
+          return a.collisionY - b.collisionY;
+        });
+        this.gameObjects.forEach((object) => {
+          object.draw(context);
+          object.update(deltaTime);
+        });
+
+        this.timer = 0;
+      }
+      this.timer += deltaTime;
+
+      // add eggs periodically
+      if (
+        this.eggTimer > this.eggInterval &&
+        this.eggs.length < this.maxEggs &&
+        !this.gameOver
+      ) {
+        this.addEggs();
+        this.eggTimer = 0;
+        //console.log(this.eggs);
+      } else {
+        this.eggTimer += deltaTime;
+      }
+
+      // draw status text
+      context.save();
+      context.textAlign = "left";
+      context.fillText(`Score: ${this.score}`, 25, 50);
+      if (this.debug) {
+        context.fillText(`Lost: ${this.lostHatchlings}`, 25, 100);
+      }
+      context.restore();
+
+      // win / lose message
+      if (this.score >= this.winningScore) {
+        this.gameOver = true;
+        context.save();
+        context.fillStyle = "rgba(0,0,0,0.5)";
+        context.fillRect(0, 0, this.width, this.height);
+        context.fillStyle = "white";
+        context.textAlign = "center";
+        context.shadowOffsetX = 4;
+        context.shadowOffsetY = 4;
+        context.shadowColor = "black";
+        let message1;
+        let message2;
+        if (this.lostHatchlings <= 5) {
+          // win
+          message1 = "Bullseye!!!";
+          message2 = "You bullied the bullies!";
+        } else {
+          // lose
+          message1 = "Bullocks!!!";
+          message2 = `You lost ${this.lostHatchlings} hatchlings, don´t be a pushover!`;
+        }
+        context.font = "130px Bangers";
+        context.fillText(message1, this.width * 0.5, this.height * 0.5 - 20);
+        context.font = "40px Bangers";
+        context.fillText(message2, this.width * 0.5, this.height * 0.5 + 30);
+        context.fillText(
+          `Final Score ${this.score}. Press 'R' to butt heads again!`,
+          this.width * 0.5,
+          this.height * 0.5 + 80
+        );
+        context.restore();
+      }
+    }
+    checkCollision(a, b) {
+      const dx = a.collisionX - b.collisionX;
+      const dy = a.collisionY - b.collisionY;
+      const distance = Math.hypot(dx, dy);
+      const sumOfRadius = a.collisionRadius + b.collisionRadius;
+      return [distance < sumOfRadius, distance, sumOfRadius, dx, dy];
+    }
+    addEggs() {
+      this.eggs.push(new Egg(this));
+    }
+    addEnemy() {
+      this.enemies.push(new Enemy(this));
+      //console.log(this.enemies);
+    }
+    removeGameObjects() {
+      this.eggs = this.eggs.filter((egg) => !egg.markedForDeletion);
+      this.hatchlings = this.hatchlings.filter(
+        (larva) => !larva.markedForDeletion
+      );
+      this.particles = this.particles.filter(
+        (particle) => !particle.markedForDeletion
+      );
+    }
+    restart() {
+      this.player.restart();
+      this.obstacles = [];
+      this.eggs = [];
+      this.particles = [];
+      this.enemies = [];
+      this.hatchlings = [];
+      this.score = 0;
+      this.lostHatchlings = 0;
+      this.gameOver = false;
+      this.mouse = {
+        x: this.width * 0.5,
+        y: this.width * 0.5,
+        pressed: false,
+      };
+      this.init();
+    }
+    init() {
+      for (let i = 0; i < 5; i++) {
+        this.addEnemy();
+      }
+      let attemps = 0;
+      while (this.obstacles.length < this.numberOfObstacles && attemps < 500) {
+        let testObstacle = new Obstacle(this);
+        let overlap = false;
+        this.obstacles.forEach((obstacle) => {
+          const dx = testObstacle.collisionX - obstacle.collisionX;
+          const dy = testObstacle.collisionY - obstacle.collisionY;
+          const distance = Math.hypot(dy, dx);
+          const distanceBuffer = 100;
+          const sumOfRadius =
+            testObstacle.collisionRadius +
+            obstacle.collisionRadius +
+            distanceBuffer;
+          if (distance < sumOfRadius) {
+            overlap = true;
+          }
+        });
+        const margin = testObstacle.collisionRadius * 3;
+        if (
+          !overlap &&
+          testObstacle.spriteX > 0 &&
+          testObstacle.spriteX < this.width - testObstacle.width &&
+          testObstacle.collisionY > this.topMargin + margin &&
+          testObstacle.collisionY < this.height - margin
+        ) {
+          this.obstacles.push(testObstacle);
+        }
+        attemps++;
+      }
+    }
+  }
+
+  const game = new Game(canvas);
+  game.init();
+
+  let lastTime = 0;
+  function animate(timeStamp) {
+    const deltaTime = timeStamp - lastTime;
+    lastTime = timeStamp;
+    //ctx.clearRect(0, 0, canvas.width, canvas.height);
+    game.render(ctx, deltaTime);
+    requestAnimationFrame(animate);
+  }
+
+  animate(0);
 });
